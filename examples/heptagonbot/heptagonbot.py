@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*- #
 
 from twitterbot import TwitterBot
+import yaml
+import random
 
-class MyTwitterBot(TwitterBot):
+class HeptagonBot(TwitterBot):
     def bot_init(self):
         """
         Initialize and configure your bot!
@@ -15,11 +17,9 @@ class MyTwitterBot(TwitterBot):
         ############################
         # REQUIRED: LOGIN DETAILS! #
         ############################
-        self.config['api_key'] = ''
-        self.config['api_secret'] = ''
-        self.config['access_key'] = ''
-        self.config['access_secret'] = ''
 
+        tokens = yaml.load(open('./config.yaml'))
+        self.config.update(tokens)
 
         ######################################
         # SEMI-OPTIONAL: OTHER CONFIG STUFF! #
@@ -39,13 +39,13 @@ class MyTwitterBot(TwitterBot):
         self.config['reply_followers_only'] = True
 
         # fav any tweets that mention this bot?
-        self.config['autofav_mentions'] = False
+        self.config['autofav_mentions'] = True
 
         # fav any tweets containing these keywords?
-        self.config['autofav_keywords'] = []
+        self.config['autofav_keywords'] = ['heptagon']
 
         # follow back all followers?
-        self.config['autofollow'] = False
+        self.config['autofollow'] = True
 
 
         ###########################################
@@ -68,6 +68,86 @@ class MyTwitterBot(TwitterBot):
         
         # self.register_custom_handler(self.my_function, 60 * 60 * 24)
 
+        # Add custom functions that respond to searches run at regular intervals
+        # using self.register_search_handler('query', function, interval [, searchparams] )
+        #
+        # If using search handlers, you must set self.state['search_handlers']
+        self.state['search_handlers'] = {}
+        self.register_search_handler("'a love heptagon'", self.on_love_heptagon, 600)
+
+
+    def on_love_heptagon(self, results):
+        """
+        Generate porn music in response to phrase 'a love heptagon'
+        """
+        for tweet in results:
+            wakachika = ''
+
+            if random.randrange(0,4):
+                wakachika += self._make_bow() + ' ' + self._make_chicka() + ' ' + self._make_bow()
+            else:
+                wakachika += 'O' + 'h' * random.randrange(1,4) + ' '
+                wakachika += 'm' + 'y' * random.randrange(2,8)
+                wakachika += '!' * random.randrange(0,2)
+
+            url = 'http://twitter.com/' + tweet.author.id_str + '/status/' + tweet.id_str
+            text = wakachika + '\r\n' + url
+
+            self.post_tweet(text)
+
+
+    def _make_bow(self):
+        bow = ''
+
+        if random.randrange(2):
+            bow += 'b'
+        else:
+            bow += 'w'
+
+        bow += 'ow'
+
+        while random.randrange(2):
+            bow += ' '
+            if random.randrange(2):
+                bow += 'b'
+            else:
+                bow += 'w'
+            if random.randrange(4):
+                bow += 'ow'
+            else:
+                bow += 'aw'
+            while random.randrange(3) > 2:
+                bow += 'w'
+
+        return bow
+
+
+    def _make_chicka(self):
+        chicka = ''
+
+        reps = 0
+        while reps < 1 + random.randrange(0,1):
+            if random.randrange(3):
+                chicka += 'chi'
+                if random.randrange(2):
+                    chicka += 'ck'
+                else:
+                    chicka += 'kk'
+            else:
+                chicka += 'w'
+                if random.randrange(2):
+                    chicka += 'a'
+                else:
+                    chicka += 'o'
+                if random.randrange(2):
+                    chicka + 'k'
+                else:
+                    chicka += 'kk'
+            chicka += 'a'
+            reps += 1
+
+        return chicka
+
 
     def on_scheduled_tweet(self):
         """
@@ -80,7 +160,7 @@ class MyTwitterBot(TwitterBot):
         # text = function_that_returns_a_string_goes_here()
         # self.post_tweet(text)
 
-        raise NotImplementedError("You need to implement this to tweet to timeline (or pass if you don't want to)!")
+        pass
         
 
     def on_mention(self, tweet, prefix):
@@ -108,7 +188,7 @@ class MyTwitterBot(TwitterBot):
         # if something:
         #     self.favorite_tweet(tweet)
 
-        raise NotImplementedError("You need to implement this to reply to/fav mentions (or pass if you don't want to)!")
+        pass
 
 
     def on_timeline(self, tweet, prefix):
@@ -136,16 +216,8 @@ class MyTwitterBot(TwitterBot):
         # if something:
         #     self.favorite_tweet(tweet)
 
-        raise NotImplementedError("You need to implement this to reply to/fav timeline tweets (or pass if you don't want to)!")
-
-
-    def on_search(self, query):
-        """
-        Defines actions to take on
-        :param query:
-        :return:
-        """
+        pass
 
 if __name__ == '__main__':
-    bot = MyTwitterBot()
+    bot = HeptagonBot()
     bot.run()

@@ -23,6 +23,7 @@ class TwitterBot:
         self.config = {}
 
         self.custom_handlers = []
+        self.search_handlers = []
 
         self.config['reply_direct_mention_only'] = False
         self.config['reply_followers_only'] = True
@@ -38,6 +39,8 @@ class TwitterBot:
         self.config['reply_interval'] = 10
         self.config['reply_interval_range'] = None
 
+        self.state = {}
+
         # call the custom initialization
         self.bot_init()
 
@@ -48,15 +51,13 @@ class TwitterBot:
         self.id = self.api.me().id
         self.screen_name = self.api.me().screen_name
 
-        self.state = {}
-        self.state_file = self.screen_name + '_state.pkl'
-
-        logging.basicConfig(format='%(asctime)s | %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', 
+        logging.basicConfig(format='%(asctime)s | %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
             filename=self.screen_name + '.log',
             level=logging.DEBUG)
 
         logging.info('Initializing bot...')
 
+        self.state_file = self.screen_name + '_state.pkl'
         try:
             with open(self.state_file) as f:
                 logging.info('Reading in previous state from {}'.format(self.state_file))
@@ -85,6 +86,8 @@ class TwitterBot:
             self.state['followers'] = self.api.followers_ids(self.id)
             self.state['new_followers'] = []
             self.state['last_follow_check'] = 0
+
+            self.state['search_handlers'] = {}
 
 
         logging.info('Bot initialized!')
@@ -176,7 +179,7 @@ class TwitterBot:
             return True
 
         except tweepy.TweepError as e:
-            self._log_tweepy_error('Can\'t post status', e)
+            self._log_tweepy_error('No post :( ', e)
             return False
 
 
@@ -226,7 +229,7 @@ class TwitterBot:
         Returns a string of users to @-mention when responding to a tweet.
         """
         mention_back = ['@' + tweet.author.screen_name]
-        mention_back += [s for s in re.split('[^@\w]', tweet.text) if len(s) > 2 and [0] == '@' and s[1:] != self.screen_name]
+        mention_back += [s for s in re.split('[^@\w]', tweet.text) if len(s) > 2 and s[0] == '@' and s[1:] != self.screen_name]
 
         if self.config['reply_followers_only']:
             mention_back = [s for s in mention_back if s[1:] in self.state['followers'] or s == '@' + tweet.author.screen_name]
@@ -303,6 +306,37 @@ class TwitterBot:
         for f_id in self.state['new_followers']:
             self.on_follow(f_id)
 
+    def register_search_handler(self, query, action, interval, searchparams={}):
+        """
+        Register a search to run at some interval.
+        """
+        search = {}
+
+        search['query'] = query
+        search['action'] = action
+        search['interval'] = interval
+        search['last_run'] = 0
+        search['last_result_id'] = 0
+        search['searchparams'] = searchparams
+
+        if query in self.state['search_handlers']:
+            search['last_result_id'] = self.state['search_handlers'][query]
+
+        self.search_handlers.append(search)
+
+
+    def _check_search(self, query, last_result_id, searchparams):
+        """
+        Runs a search.
+        """
+        try:
+            results = self.api.search(q=query, since_id=last_result_id, **searchparams)
+            return results
+        except tweepy.TweepError as e:
+            self._log_tweepy_error('Can\'t retrieve search', e)
+            return None
+
+
     def register_custom_handler(self, action, interval):
         """
         Register a custom action to run at some interval.
@@ -355,6 +389,16 @@ class TwitterBot:
                 if (time.time() - handler['last_run']) > handler['interval']:
                     handler['action']()
                     handler['last_run'] = time.time()
+
+            # run searches
+            for handler in self.search_handlers:
+                if (time.time() - handler['last_run']) > handler['interval']:
+                    results = self._check_search(handler['query'], last_result_id=handler['last_result_id'], searchparams=handler['searchparams'])
+                    if len(results) > 0:
+                        handler['last_result_id'] = results[0].id
+                    handler['action'](results)
+                    handler['last_run'] = time.time()
+                self.state['search_handlers'][handler['query']] = handler['last_result_id']
 
             # save current state
             self._save_state()
